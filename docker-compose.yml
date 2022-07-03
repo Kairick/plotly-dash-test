@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  ticker_web:
+    container_name: ticker_web
+    restart: always
+    build: .
+    command: gunicorn app:server --bind=0.0.0.0:8000 --workers=3
+    ports:
+    - 8000:8000
+    links:
+      - redis
+    depends_on:
+      - redis
+
+  redis:
+    container_name: redis
+    restart: always
+    image: redis:5-alpine
+    hostname: redis
+    ports:
+      - 6379:6379
+
+  celery:
+    build:
+      context: api/.
+    container_name: celery
+    hostname: worker
+    entrypoint: celery
+    command: -A celery_app.celery worker --loglevel=debug
+    volumes:
+      - ./api:/app
+    links:
+      - redis
+    depends_on:
+      - redis
+
+  celerybeat:
+    build:
+      context: api/.
+    container_name: celery-beat
+    entrypoint: celery
+    links:
+      - redis
+      - celery
+    depends_on:
+      - celery
+      - redis
+    command: -A celery_app.celery beat -l DEBUG
